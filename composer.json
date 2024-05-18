@@ -1,0 +1,21 @@
+{
+  "name": "shoutboxnet/shoutbox",
+  "description": "Shoutbox.net is a Developer API designed to send transactional emails at scale.",
+  "type": "library",
+  "require": {
+    "php": ">=7.2.0",
+    "vlucas/phpdotenv": "^5.4"
+  },
+  "autoload": {
+    "psr-4": {
+      "Shoutbox\\": "src/"
+    }
+  },
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Tycho",
+      "email": "tycho@shoutbox.net"
+    }
+  ]
+}

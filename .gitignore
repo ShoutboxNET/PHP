@@ -1,0 +1,77 @@
+# Composer dependencies
+/vendor/
+
+# Composer itself
+/composer.phar
+
+# OS or Editor specific files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Laravel specific (if you're using Laravel)
+.env
+.env.*.backup
+/storage/
+vendor/
+node_modules/
+public/hot
+public/storage
+public/mix-manifest.json
+/public/hot
+/public/storage
+/storage/*.key
+
+# Symfony specific (if you're using Symfony)
+/var/
+/public/uploads/
+
+# PHPStorm project files
+.idea/
+
+# Vagrant
+.vagrant/
+
+# Logs and temp files
+*.log
+*.cache
+*.tmp
+
+# PHPUnit
+phpunit.xml
+phpunit.xml.dist
+
+# Coverage reports
+/coverage/
+
+# Ignoring tests (optional)
+tests/
+
+# Ignore .env files, if present
+.env
+.env.local
+.env.*.local
+
+# Ignore build directories and files
+/build/
+**/build/
+
+# Ignore node_modules directory, if using Node.js
+/node_modules/
+
+# Ignore npm debug log
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Ignore IDE specific files
+/.idea/
+*.iml
+
+# Ignore compiled binary files
+*.out
+*.o
+
+# Ignore user installed binaries
+/vendor/bin/
