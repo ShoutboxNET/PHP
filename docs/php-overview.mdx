@@ -1,0 +1,194 @@
+---
+title: "PHP Integration Overview"
+description: "Overview of PHP integration options for the Email API"
+---
+
+# PHP Integration Options
+
+Our Email API offers multiple approaches for PHP integration:
+
+1. Direct REST API calls (no dependencies)
+2. API Client (using our PHP library)
+3. SMTP Client (using our PHP library)
+4. Laravel Integration
+
+## Comparison of Approaches
+
+### 1. Direct REST API
+
+[View Direct API Implementation →](/examples/php-direct-api)
+
+#### Pros
+- No dependencies required
+- Complete control over requests
+- Lightweight implementation
+- Maximum flexibility
+- Simple integration
+- Suitable for minimal projects
+
+#### Example
+```php
+$curl = curl_init('https://api.shoutbox.net/send');
+curl_setopt_array($curl, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_POST => true,
+    CURLOPT_POSTFIELDS => json_encode([
+        'from' => "sender@yourdomain.com",
+        'to' => "recipient@example.com",
+        'subject' => "Hello World",
+        'html' => "<h1>Welcome!</h1>"
+    ]),
+    CURLOPT_HTTPHEADER => [
+        'Authorization: Bearer ' . getenv('SHOUTBOX_API_KEY'),
+        'Content-Type: application/json'
+    ]
+]);
+
+$response = curl_exec($curl);
+```
+
+### 2. API Client
+
+[View API Client Implementation →](/examples/php-api-client)
+
+#### Pros
+- Type-safe email options
+- Built-in error handling
+- Automatic request validation
+- Simple file attachment handling
+- Clean, object-oriented interface
+- Regular updates and improvements
+
+#### Example
+```php
+use Shoutbox\Client;
+use Shoutbox\EmailOptions;
+
+$client = new Client('your-api-key');
+
+$options = new EmailOptions();
+$options->from = "sender@yourdomain.com";
+$options->to = "recipient@example.com";
+$options->subject = "Hello World";
+$options->html = "<h1>Welcome!</h1>";
+
+$client->sendEmail($options);
+```
+
+### 3. SMTP Client
+
+[View SMTP Client Implementation →](/examples/php-smtp-client)
+
+#### Pros
+- SMTP protocol support
+- Legacy system compatibility
+- Same features as API client
+- Multiple recipient support
+- Custom headers support
+- Attachment handling
+
+#### Example
+```php
+use Shoutbox\SMTPClient;
+use Shoutbox\EmailOptions;
+
+$client = new SMTPClient('your-api-key');
+
+$options = new EmailOptions();
+$options->from = "sender@yourdomain.com";
+$options->to = ["recipient1@example.com", "recipient2@example.com"];
+$options->subject = "Hello World";
+$options->html = "<h1>Welcome!</h1>";
+
+$client->sendEmail($options);
+```
+
+### 4. Laravel Integration
+
+[View Laravel Integration →](/examples/php-laravel)
+
+#### Pros
+- Full Laravel Mail integration
+- Queue system support
+- Rate limiting capabilities
+- Exception handling
+- Configuration management
+- Service provider auto-discovery
+- Laravel storage integration
+
+#### Example
+```php
+// In your Laravel application
+Mail::to('recipient@example.com')
+    ->from('sender@yourdomain.com', 'Sender Name')
+    ->replyTo('reply@example.com')
+    ->send(new ShoutboxMail('<h1>Welcome!</h1>'));
+
+// With queues
+class SendEmailJob implements ShouldQueue
+{
+    public function handle()
+    {
+        Mail::to('recipient@example.com')
+            ->send(new ShoutboxMail('<h1>Welcome!</h1>'));
+    }
+}
+```
+
+## Feature Comparison
+
+| Feature                 | Direct API | API Client | SMTP Client | Laravel    |
+|------------------------|------------|------------|-------------|------------|
+| Dependencies           | None       | Library    | Library     | Framework  |
+| Type Safety            | ❌         | ✅         | ✅          | ✅         |
+| Error Handling         | Manual     | Built-in   | Built-in    | Built-in   |
+| Request Validation     | Manual     | Auto       | Auto        | Auto       |
+| File Attachments       | Manual     | Simple     | Simple      | Simple     |
+| Multiple Recipients    | Manual     | ✅         | ✅          | ✅         |
+| Custom Headers         | ✅         | ✅         | ✅          | ✅         |
+| Queue Support          | Manual     | Manual     | Manual      | Built-in   |
+| Rate Limiting          | Manual     | Manual     | Manual      | Built-in   |
+| Framework Features     | ❌         | ❌         | ❌          | ✅         |
+| Learning Curve         | Low        | Low        | Low         | Medium     |
+| Setup Complexity       | Minimal    | Simple     | Simple      | Moderate   |
+
+## Choosing the Right Approach
+
+### Use Direct API When:
+- You want zero dependencies
+- You need complete control
+- You're building a minimal application
+- You prefer procedural code
+- You want the lightest implementation
+
+### Use API Client When:
+- You want a clean, object-oriented API
+- You need type safety
+- You want automatic error handling
+- You're using Composer
+- You're not using a framework
+
+### Use SMTP Client When:
+- You need SMTP protocol support
+- You're integrating with legacy systems
+- You want the same features as API client
+- You need multiple recipient support
+- You prefer SMTP over REST
+
+### Use Laravel Integration When:
+- You're using Laravel
+- You want framework integration
+- You need queue support
+- You want built-in rate limiting
+- You prefer dependency injection
+
+## Getting Started
+
+Choose your preferred approach and follow the detailed implementation guide:
+
+- [Direct API Implementation Guide →](/examples/php-direct-api)
+- [API Client Implementation Guide →](/examples/php-api-client)
+- [SMTP Client Implementation Guide →](/examples/php-smtp-client)
+- [Laravel Integration Guide →](/examples/php-laravel)
+
+All approaches are fully supported and maintained. Choose based on your project's specific needs and constraints.

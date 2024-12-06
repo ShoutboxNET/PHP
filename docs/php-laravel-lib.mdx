@@ -1,0 +1,350 @@
+---
+title: "Laravel Library Integration"
+description: "Detailed guide for using the Shoutbox library with Laravel"
+---
+
+# Laravel Library Integration
+
+This guide covers the integration of the Shoutbox PHP library specifically with Laravel applications.
+
+## Installation
+
+1. Install the package:
+```bash
+composer require shoutboxnet/shoutbox
+```
+
+2. Add configuration to `config/services.php`:
+```php
+'shoutbox' => [
+    'key' => env('SHOUTBOX_API_KEY'),
+],
+```
+
+3. Add to `.env`:
+```
+SHOUTBOX_API_KEY=your-api-key-here
+```
+
+## Service Provider
+
+The package includes a Laravel service provider that automatically registers the Shoutbox client in the service container.
+
+### Manual Registration
+
+If auto-discovery is disabled, add to `config/app.php`:
+
+```php
+'providers' => [
+    // ...
+    Shoutbox\Laravel\ShoutboxServiceProvider::class,
+],
+```
+
+## Basic Usage
+
+### Using Dependency Injection
+
+```php
+use Shoutbox\Client;
+
+class EmailController extends Controller
+{
+    private $client;
+
+    public function __construct(Client $client)
+    {
+        $this->client = $client;
+    }
+
+    public function send()
+    {
+        $options = new EmailOptions();
+        $options->from = 'sender@example.com';
+        $options->to = 'recipient@example.com';
+        $options->subject = 'Test Email';
+        $options->html = '<h1>Hello!</h1>';
+
+        $this->client->sendEmail($options);
+    }
+}
+```
+
+### Using the Facade
+
+```php
+use Shoutbox\Laravel\Facades\Shoutbox;
+
+class EmailController extends Controller
+{
+    public function send()
+    {
+        $options = new EmailOptions();
+        $options->from = 'sender@example.com';
+        $options->to = 'recipient@example.com';
+        $options->subject = 'Test Email';
+        $options->html = '<h1>Hello!</h1>';
+
+        Shoutbox::sendEmail($options);
+    }
+}
+```
+
+## Advanced Features
+
+### File Attachments with Laravel Storage
+
+```php
+use Illuminate\Support\Facades\Storage;
+use Shoutbox\Attachment;
+
+class EmailService
+{
+    private $client;
+
+    public function __construct(Client $client)
+    {
+        $this->client = $client;
+    }
+
+    public function sendWithAttachment(string $filePath)
+    {
+        // Get file from Laravel storage
+        $fullPath = Storage::path($filePath);
+        
+        $attachment = new Attachment();
+        $attachment->filepath = $fullPath;
+        $attachment->filename = basename($filePath);
+
+        $options = new EmailOptions();
+        $options->from = 'sender@example.com';
+        $options->to = 'recipient@example.com';
+        $options->subject = 'File Attached';
+        $options->html = '<h1>Please find the file attached</h1>';
+        $options->attachments = [$attachment];
+
+        $this->client->sendEmail($options);
+    }
+}
+```
+
+### Queue Integration
+
+```php
+class SendEmailJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    private $options;
+
+    public function __construct(EmailOptions $options)
+    {
+        $this->options = $options;
+    }
+
+    public function handle(Client $client)
+    {
+        $client->sendEmail($this->options);
+    }
+}
+
+// Usage
+$options = new EmailOptions();
+$options->from = 'sender@example.com';
+$options->to = 'recipient@example.com';
+$options->subject = 'Queued Email';
+$options->html = '<h1>This email was queued</h1>';
+
+SendEmailJob::dispatch($options);
+```
+
+### Rate Limiting
+
+```php
+use Illuminate\Support\Facades\RateLimiter;
+
+class EmailService
+{
+    private $client;
+
+    public function __construct(Client $client)
+    {
+        $this->client = $client;
+    }
+
+    public function sendWithRateLimit(EmailOptions $options)
+    {
+        $executed = RateLimiter::attempt(
+            'send-email',
+            1, // attempts
+            function() use ($options) {
+                $this->client->sendEmail($options);
+            },
+            60 // decay seconds
+        );
+
+        if (!$executed) {
+            throw new \RuntimeException('Rate limit exceeded');
+        }
+    }
+}
+```
+
+## Error Handling
+
+### Exception Handling
+
+```php
+use Shoutbox\Exceptions\ApiException;
+use Shoutbox\Exceptions\ValidationException;
+
+class EmailService
+{
+    private $client;
+
+    public function __construct(Client $client)
+    {
+        $this->client = $client;
+    }
+
+    public function send(EmailOptions $options)
+    {
+        try {
+            $this->client->sendEmail($options);
+        } catch (ValidationException $e) {
+            Log::error('Email validation failed', [
+                'errors' => $e->getErrors(),
+                'options' => $options
+            ]);
+            throw $e;
+        } catch (ApiException $e) {
+            Log::error('API error occurred', [
+                'code' => $e->getCode(),
+                'message' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+}
+```
+
+### Custom Exception Handler
+
+```php
+namespace App\Exceptions;
+
+use Shoutbox\Exceptions\ApiException;
+use Shoutbox\Exceptions\ValidationException;
+
+class Handler extends ExceptionHandler
+{
+    public function register()
+    {
+        $this->renderable(function (ApiException $e) {
+            return response()->json([
+                'error' => 'Email service error',
+                'message' => $e->getMessage()
+            ], 500);
+        });
+
+        $this->renderable(function (ValidationException $e) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'errors' => $e->getErrors()
+            ], 422);
+        });
+    }
+}
+```
+
+## Testing
+
+### Feature Tests
+
+```php
+use Tests\TestCase;
+use Shoutbox\Client;
+use Shoutbox\EmailOptions;
+
+class EmailTest extends TestCase
+{
+    public function test_sends_email()
+    {
+        $this->mock(Client::class, function ($mock) {
+            $mock->shouldReceive('sendEmail')
+                 ->once()
+                 ->andReturn(true);
+        });
+
+        $response = $this->post('/api/send-email', [
+            'to' => 'test@example.com',
+            'subject' => 'Test',
+            'content' => 'Hello'
+        ]);
+
+        $response->assertStatus(200);
+    }
+}
+```
+
+### Unit Tests
+
+```php
+use Tests\TestCase;
+use Shoutbox\Client;
+use Mockery;
+
+class EmailServiceTest extends TestCase
+{
+    public function test_rate_limiting()
+    {
+        $client = Mockery::mock(Client::class);
+        $service = new EmailService($client);
+
+        $options = new EmailOptions();
+        // ... set options
+
+        // First call should succeed
+        $service->sendWithRateLimit($options);
+
+        // Second call should throw rate limit exception
+        $this->expectException(\RuntimeException::class);
+        $service->sendWithRateLimit($options);
+    }
+}
+```
+
+## Best Practices
+
+1. **Configuration**
+   - Use environment variables
+   - Implement proper config caching
+   - Set up different keys per environment
+
+2. **Error Handling**
+   - Log all errors
+   - Implement proper exception handling
+   - Use custom exception handlers
+
+3. **Performance**
+   - Use queues for bulk sending
+   - Implement rate limiting
+   - Cache when possible
+
+4. **Testing**
+   - Mock the Shoutbox client
+   - Test error scenarios
+   - Verify rate limiting
+
+5. **Security**
+   - Validate input
+   - Sanitize content
+   - Protect API keys
+
+## Support
+
+For additional support:
+- Check GitHub issues
+- Review API documentation
+- Contact support team
+- Join developer community

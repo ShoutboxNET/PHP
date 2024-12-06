@@ -1,0 +1,310 @@
+---
+title: "Laravel Integration"
+description: "Detailed guide for integrating Shoutbox with Laravel"
+---
+
+# Laravel Integration Guide
+
+This guide covers the integration of Shoutbox with Laravel, including setup, configuration, and usage patterns.
+
+## Installation
+
+1. Install the package via Composer:
+```bash
+composer require shoutboxnet/shoutbox
+```
+
+2. Add your Shoutbox configuration to `config/services.php`:
+```php
+'shoutbox' => [
+    'key' => env('SHOUTBOX_API_KEY'),
+],
+```
+
+3. Add your API key to `.env`:
+```
+SHOUTBOX_API_KEY=your-api-key-here
+```
+
+## Basic Usage
+
+### Simple Email
+
+```php
+use Illuminate\Support\Facades\Mail;
+
+Mail::to('recipient@example.com')
+    ->send(new ShoutboxMail('<h1>Hello</h1><p>This is a test email.</p>'));
+```
+
+### Advanced Email Options
+
+```php
+Mail::to('recipient@example.com')
+    ->from('sender@example.com', 'Sender Name')
+    ->replyTo('reply@example.com')
+    ->cc(['cc1@example.com', 'cc2@example.com'])
+    ->send(new ShoutboxMail('<h1>Hello</h1><p>This is a test email.</p>'));
+```
+
+## Queue Integration
+
+### Basic Queue Usage
+
+```php
+class SendEmailJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public function handle()
+    {
+        Mail::to('recipient@example.com')
+            ->send(new ShoutboxMail('<h1>Hello</h1><p>This is a queued email.</p>'));
+    }
+}
+```
+
+### Dispatching the Job
+
+```php
+SendEmailJob::dispatch();
+// or with delay
+SendEmailJob::dispatch()->delay(now()->addMinutes(10));
+```
+
+## Custom Mailable
+
+### Creating a Custom Mailable
+
+```php
+use Illuminate\Bus\Queueable;
+use Illuminate\Mail\Mailable;
+use Illuminate\Queue\SerializesModels;
+
+class WelcomeEmail extends Mailable
+{
+    use Queueable, SerializesModels;
+
+    private $userData;
+
+    public function __construct($userData)
+    {
+        $this->userData = $userData;
+    }
+
+    public function build()
+    {
+        return $this->view('emails.welcome')
+                    ->with([
+                        'name' => $this->userData['name'],
+                        'email' => $this->userData['email']
+                    ]);
+    }
+}
+```
+
+### Using Custom Mailable
+
+```php
+Mail::to($user->email)->send(new WelcomeEmail($userData));
+```
+
+## Attachments
+
+### Adding Attachments
+
+```php
+use Illuminate\Support\Facades\Mail;
+use Shoutbox\Attachment;
+
+$attachment = new Attachment();
+$attachment->filepath = storage_path('app/documents/report.pdf');
+$attachment->filename = 'quarterly-report.pdf';
+$attachment->contentType = 'application/pdf';
+
+Mail::to('recipient@example.com')
+    ->send(new ShoutboxMail('<h1>Report Attached</h1>', [$attachment]));
+```
+
+## Error Handling
+
+### Try-Catch Block
+
+```php
+try {
+    Mail::to('recipient@example.com')
+        ->send(new ShoutboxMail('<h1>Hello</h1>'));
+} catch (\Exception $e) {
+    Log::error('Failed to send email: ' . $e->getMessage());
+    // Handle the error
+}
+```
+
+### Queue Error Handling
+
+```php
+class SendEmailJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public $tries = 3; // Number of retries
+    public $backoff = [60, 180, 360]; // Delay between retries in seconds
+
+    public function handle()
+    {
+        Mail::to('recipient@example.com')
+            ->send(new ShoutboxMail('<h1>Hello</h1>'));
+    }
+
+    public function failed(\Exception $e)
+    {
+        Log::error('Email job failed: ' . $e->getMessage());
+        // Notify team or take other actions
+    }
+}
+```
+
+## Rate Limiting
+
+### Basic Rate Limiting
+
+```php
+// In a service provider or middleware
+RateLimiter::for('sending-emails', function (Request $request) {
+    return Limit::perMinute(60); // 60 emails per minute
+});
+
+// In your code
+RateLimiter::attempt(
+    'sending-emails',
+    1, // Number of attempts to consume
+    function() {
+        Mail::to('recipient@example.com')
+            ->send(new ShoutboxMail('<h1>Hello</h1>'));
+    }
+);
+```
+
+### Queue Rate Limiting
+
+```php
+class SendEmailJob implements ShouldQueue
+{
+    public $tries = 3;
+
+    public function middleware()
+    {
+        return [new ThrottlesExceptions(60, 1)]; // 60 attempts per minute
+    }
+
+    public function handle()
+    {
+        Mail::to('recipient@example.com')
+            ->send(new ShoutboxMail('<h1>Hello</h1>'));
+    }
+}
+```
+
+## Testing
+
+### Mail Fake
+
+```php
+use Illuminate\Support\Facades\Mail;
+
+class EmailTest extends TestCase
+{
+    public function test_sending_welcome_email()
+    {
+        Mail::fake();
+
+        // Trigger email sending
+        $this->post('/register', [
+            'email' => 'test@example.com',
+            'name' => 'Test User'
+        ]);
+
+        Mail::assertSent(WelcomeEmail::class, function ($mail) {
+            return $mail->hasTo('test@example.com');
+        });
+    }
+}
+```
+
+### Queue Fake
+
+```php
+use Illuminate\Support\Facades\Queue;
+
+class EmailTest extends TestCase
+{
+    public function test_queued_email()
+    {
+        Queue::fake();
+
+        // Trigger job dispatch
+        SendEmailJob::dispatch();
+
+        Queue::assertPushed(SendEmailJob::class);
+    }
+}
+```
+
+## Best Practices
+
+1. **Environment Configuration**
+   - Keep API keys in `.env`
+   - Use different keys for development/production
+   - Configure queue settings appropriately
+
+2. **Error Handling**
+   - Implement proper try-catch blocks
+   - Log errors comprehensively
+   - Set up proper queue error handling
+
+3. **Performance**
+   - Use queues for bulk sending
+   - Implement rate limiting
+   - Monitor queue performance
+
+4. **Testing**
+   - Write comprehensive tests
+   - Use Mail::fake() and Queue::fake()
+   - Test error scenarios
+
+5. **Security**
+   - Validate email addresses
+   - Sanitize HTML content
+   - Protect API keys
+
+## Troubleshooting
+
+Common issues and solutions:
+
+1. **Emails not sending**
+   - Check API key configuration
+   - Verify queue worker is running
+   - Check for rate limiting
+
+2. **Queue issues**
+   - Run `php artisan queue:restart`
+   - Check queue configuration
+   - Monitor failed_jobs table
+
+3. **Rate limiting**
+   - Adjust rate limits
+   - Implement proper queuing
+   - Monitor API usage
+
+4. **Attachment problems**
+   - Verify file permissions
+   - Check file paths
+   - Validate file sizes
+
+## Support
+
+For additional support:
+- Check GitHub issues
+- Contact support team
+- Review API documentation
+- Join developer community

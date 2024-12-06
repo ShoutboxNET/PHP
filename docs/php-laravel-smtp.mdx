@@ -1,0 +1,338 @@
+---
+title: "Laravel SMTP Integration"
+description: "Detailed guide for using the Shoutbox SMTP client with Laravel"
+---
+
+# Laravel SMTP Integration
+
+This guide covers the integration of the Shoutbox SMTP client specifically with Laravel applications.
+
+## Installation
+
+1. Install the package:
+```bash
+composer require shoutboxnet/shoutbox
+```
+
+2. Add configuration to `config/services.php`:
+```php
+'shoutbox' => [
+    'key' => env('SHOUTBOX_API_KEY'),
+],
+```
+
+3. Add to `.env`:
+```
+SHOUTBOX_API_KEY=your-api-key-here
+```
+
+## Configuration
+
+### Mail Configuration
+
+Update `config/mail.php` to use Shoutbox SMTP:
+
+```php
+'mailers' => [
+    'shoutbox' => [
+        'transport' => 'shoutbox',
+        'key' => env('SHOUTBOX_API_KEY'),
+    ],
+],
+
+'default' => 'shoutbox',
+```
+
+### Service Provider Registration
+
+The package's service provider automatically registers the SMTP transport. If auto-discovery is disabled, add to `config/app.php`:
+
+```php
+'providers' => [
+    // ...
+    Shoutbox\Laravel\ShoutboxServiceProvider::class,
+],
+```
+
+## Basic Usage
+
+### Using Mail Facade
+
+```php
+use Illuminate\Support\Facades\Mail;
+
+class EmailController extends Controller
+{
+    public function send()
+    {
+        Mail::to('recipient@example.com')
+            ->send(new WelcomeEmail());
+    }
+}
+```
+
+### Creating Mailable
+
+```php
+use Illuminate\Mail\Mailable;
+
+class WelcomeEmail extends Mailable
+{
+    public function build()
+    {
+        return $this->view('emails.welcome')
+                    ->subject('Welcome to Our Service');
+    }
+}
+```
+
+## Advanced Features
+
+### Attachments with Laravel Storage
+
+```php
+use Illuminate\Mail\Mailable;
+use Illuminate\Support\Facades\Storage;
+
+class DocumentEmail extends Mailable
+{
+    private $document;
+
+    public function __construct($document)
+    {
+        $this->document = $document;
+    }
+
+    public function build()
+    {
+        return $this->view('emails.document')
+                    ->subject('Your Document')
+                    ->attach(Storage::path($this->document));
+    }
+}
+
+// Usage
+Mail::to('recipient@example.com')
+    ->send(new DocumentEmail('documents/report.pdf'));
+```
+
+### Queue Integration
+
+```php
+class SendEmailJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    private $recipient;
+
+    public function __construct($recipient)
+    {
+        $this->recipient = $recipient;
+    }
+
+    public function handle()
+    {
+        Mail::to($this->recipient)
+            ->send(new WelcomeEmail());
+    }
+}
+
+// Usage
+SendEmailJob::dispatch('recipient@example.com');
+```
+
+### Batch Sending
+
+```php
+use Illuminate\Support\Facades\Bus;
+
+class EmailController extends Controller
+{
+    public function sendBatch(array $recipients)
+    {
+        $jobs = [];
+        
+        foreach ($recipients as $recipient) {
+            $jobs[] = new SendEmailJob($recipient);
+        }
+
+        Bus::batch($jobs)
+            ->allowFailures()
+            ->dispatch();
+    }
+}
+```
+
+### Rate Limiting
+
+```php
+use Illuminate\Support\Facades\RateLimiter;
+
+class EmailService
+{
+    public function sendWithRateLimit($recipient)
+    {
+        $executed = RateLimiter::attempt(
+            'send-email',
+            1, // attempts
+            function() use ($recipient) {
+                Mail::to($recipient)->send(new WelcomeEmail());
+            },
+            60 // decay seconds
+        );
+
+        if (!$executed) {
+            throw new \RuntimeException('Rate limit exceeded');
+        }
+    }
+}
+```
+
+## Error Handling
+
+### Exception Handling
+
+```php
+try {
+    Mail::to('recipient@example.com')
+        ->send(new WelcomeEmail());
+} catch (\Shoutbox\Exceptions\SmtpException $e) {
+    Log::error('SMTP error occurred', [
+        'code' => $e->getCode(),
+        'message' => $e->getMessage()
+    ]);
+    throw $e;
+} catch (\Exception $e) {
+    Log::error('Email error occurred', [
+        'message' => $e->getMessage()
+    ]);
+    throw $e;
+}
+```
+
+### Custom Exception Handler
+
+```php
+namespace App\Exceptions;
+
+use Shoutbox\Exceptions\SmtpException;
+
+class Handler extends ExceptionHandler
+{
+    public function register()
+    {
+        $this->renderable(function (SmtpException $e) {
+            return response()->json([
+                'error' => 'Email service error',
+                'message' => $e->getMessage()
+            ], 500);
+        });
+    }
+}
+```
+
+## Testing
+
+### Mail Fake
+
+```php
+use Illuminate\Support\Facades\Mail;
+use Tests\TestCase;
+
+class EmailTest extends TestCase
+{
+    public function test_sends_welcome_email()
+    {
+        Mail::fake();
+
+        // Trigger the email
+        $this->post('/register', [
+            'email' => 'test@example.com',
+            'name' => 'Test User'
+        ]);
+
+        Mail::assertSent(WelcomeEmail::class, function ($mail) {
+            return $mail->hasTo('test@example.com');
+        });
+    }
+}
+```
+
+### Queue Testing
+
+```php
+use Illuminate\Support\Facades\Queue;
+
+class EmailTest extends TestCase
+{
+    public function test_queues_email_job()
+    {
+        Queue::fake();
+
+        SendEmailJob::dispatch('recipient@example.com');
+
+        Queue::assertPushed(SendEmailJob::class, function ($job) {
+            return $job->recipient === 'recipient@example.com';
+        });
+    }
+}
+```
+
+## Best Practices
+
+1. **Configuration Management**
+   - Use environment variables
+   - Set up per-environment configs
+   - Cache configuration in production
+
+2. **Error Handling**
+   - Implement proper logging
+   - Use custom exception handlers
+   - Monitor failed jobs
+
+3. **Performance**
+   - Use queues for bulk sending
+   - Implement rate limiting
+   - Monitor queue performance
+
+4. **Testing**
+   - Use Mail::fake()
+   - Test error scenarios
+   - Verify queue behavior
+
+5. **Security**
+   - Validate email addresses
+   - Sanitize content
+   - Protect credentials
+
+## Troubleshooting
+
+Common issues and solutions:
+
+1. **Connection Issues**
+   - Verify API key
+   - Check network connectivity
+   - Confirm firewall settings
+
+2. **Queue Problems**
+   - Check queue worker status
+   - Monitor failed jobs
+   - Verify queue configuration
+
+3. **Rate Limiting**
+   - Adjust rate limits
+   - Implement proper queuing
+   - Monitor sending patterns
+
+4. **Attachment Issues**
+   - Check file permissions
+   - Verify file paths
+   - Monitor attachment sizes
+
+## Support
+
+For additional support:
+- Review error logs
+- Check documentation
+- Contact support team
+- Join developer community

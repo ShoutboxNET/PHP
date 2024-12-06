@@ -1,0 +1,321 @@
+---
+title: "PHP Library Implementation"
+description: "Detailed guide for using the Shoutbox PHP library"
+---
+
+# PHP Library Implementation Guide
+
+This guide covers the usage of the Shoutbox PHP library, focusing on the API Client implementation.
+
+## Installation
+
+Install via Composer:
+```bash
+composer require shoutboxnet/shoutbox
+```
+
+## API Client Usage
+
+### Basic Setup
+
+```php
+use Shoutbox\Client;
+use Shoutbox\EmailOptions;
+
+$apiKey = getenv('SHOUTBOX_API_KEY') ?: 'your-api-key-here';
+$client = new Client($apiKey);
+```
+
+### Sending Basic Email
+
+```php
+try {
+    $options = new EmailOptions();
+    $options->from = 'sender@example.com';
+    $options->to = 'recipient@example.com';
+    $options->subject = 'Test Email';
+    $options->html = '<h1>Hello!</h1><p>This is a test email.</p>';
+    $options->name = 'Sender Name';
+    $options->replyTo = 'reply@example.com';
+
+    $client->sendEmail($options);
+    echo "Email sent successfully!\n";
+} catch (Exception $e) {
+    echo "Error: " . $e->getMessage() . "\n";
+}
+```
+
+### Multiple Recipients
+
+```php
+$options = new EmailOptions();
+$options->from = 'sender@example.com';
+$options->to = [
+    'recipient1@example.com',
+    'recipient2@example.com'
+];
+$options->cc = [
+    'cc1@example.com',
+    'cc2@example.com'
+];
+$options->subject = 'Group Email';
+$options->html = '<h1>Hello Everyone!</h1>';
+
+$client->sendEmail($options);
+```
+
+### Adding Attachments
+
+```php
+use Shoutbox\Attachment;
+
+$attachment = new Attachment();
+$attachment->filepath = './document.pdf';
+$attachment->filename = 'report.pdf'; // Optional
+$attachment->contentType = 'application/pdf'; // Optional
+
+$options = new EmailOptions();
+$options->from = 'sender@example.com';
+$options->to = 'recipient@example.com';
+$options->subject = 'Document Attached';
+$options->html = '<h1>Please find the document attached</h1>';
+$options->attachments = [$attachment];
+
+$client->sendEmail($options);
+```
+
+### Custom Headers
+
+```php
+$options = new EmailOptions();
+$options->from = 'sender@example.com';
+$options->to = 'recipient@example.com';
+$options->subject = 'Test Email';
+$options->html = '<h1>Hello!</h1>';
+$options->headers = [
+    'X-Custom-Header' => 'Custom Value',
+    'X-Priority' => '1'
+];
+
+$client->sendEmail($options);
+```
+
+### Using Tags
+
+```php
+$options = new EmailOptions();
+$options->from = 'sender@example.com';
+$options->to = 'recipient@example.com';
+$options->subject = 'Tagged Email';
+$options->html = '<h1>Hello!</h1>';
+$options->tags = ['welcome', 'onboarding'];
+
+$client->sendEmail($options);
+```
+
+## EmailOptions Reference
+
+### Available Properties
+
+```php
+class EmailOptions {
+    public string $from;              // Required: Sender email
+    public string|array $to;          // Required: Recipient email(s)
+    public string $subject;           // Required: Email subject
+    public string $html;              // Optional: HTML content
+    public string $text;              // Optional: Plain text content
+    public string $name;              // Optional: Sender name
+    public string $replyTo;           // Optional: Reply-to address
+    public string|array $cc;          // Optional: CC recipient(s)
+    public string|array $bcc;         // Optional: BCC recipient(s)
+    public array $attachments;        // Optional: File attachments
+    public array $headers;            // Optional: Custom headers
+    public array $tags;               // Optional: Email tags
+}
+```
+
+### Attachment Properties
+
+```php
+class Attachment {
+    public string $filepath;          // Required: Path to file
+    public string $filename;          // Optional: Custom filename
+    public string $contentType;       // Optional: MIME type
+    public string $content;           // Optional: Base64 content
+}
+```
+
+## Error Handling
+
+### Basic Error Handling
+
+```php
+try {
+    $client->sendEmail($options);
+} catch (\Shoutbox\Exceptions\ApiException $e) {
+    // Handle API-specific errors
+    echo "API Error: " . $e->getMessage() . "\n";
+    echo "Status Code: " . $e->getCode() . "\n";
+} catch (\Shoutbox\Exceptions\ValidationException $e) {
+    // Handle validation errors
+    echo "Validation Error: " . $e->getMessage() . "\n";
+} catch (\Exception $e) {
+    // Handle other errors
+    echo "General Error: " . $e->getMessage() . "\n";
+}
+```
+
+### Validation Handling
+
+```php
+try {
+    $options = new EmailOptions();
+    // Missing required fields will throw ValidationException
+    $client->sendEmail($options);
+} catch (\Shoutbox\Exceptions\ValidationException $e) {
+    echo "Validation failed: " . $e->getMessage() . "\n";
+    // Access validation errors
+    foreach ($e->getErrors() as $field => $error) {
+        echo "$field: $error\n";
+    }
+}
+```
+
+## Best Practices
+
+### Configuration Management
+
+```php
+// Load from environment
+$apiKey = getenv('SHOUTBOX_API_KEY');
+if (!$apiKey) {
+    throw new RuntimeException('SHOUTBOX_API_KEY not set');
+}
+
+$client = new Client($apiKey);
+```
+
+### Rate Limiting
+
+```php
+class EmailSender {
+    private $client;
+    private $lastSent = 0;
+    private $rateLimit = 1; // seconds between sends
+
+    public function __construct(Client $client) {
+        $this->client = $client;
+    }
+
+    public function sendWithRateLimit(EmailOptions $options) {
+        $now = time();
+        $timeSinceLastSend = $now - $this->lastSent;
+        
+        if ($timeSinceLastSend < $this->rateLimit) {
+            sleep($this->rateLimit - $timeSinceLastSend);
+        }
+
+        $this->client->sendEmail($options);
+        $this->lastSent = time();
+    }
+}
+```
+
+### Bulk Sending
+
+```php
+class BulkEmailSender {
+    private $client;
+    private $batchSize = 50;
+    private $delayBetweenBatches = 1; // seconds
+
+    public function __construct(Client $client) {
+        $this->client = $client;
+    }
+
+    public function sendBulk(array $recipients, EmailOptions $template) {
+        $batches = array_chunk($recipients, $this->batchSize);
+
+        foreach ($batches as $batch) {
+            foreach ($batch as $recipient) {
+                $options = clone $template;
+                $options->to = $recipient;
+                
+                try {
+                    $this->client->sendEmail($options);
+                } catch (Exception $e) {
+                    // Log error and continue
+                    error_log("Failed to send to {$recipient}: {$e->getMessage()}");
+                }
+            }
+
+            // Delay between batches
+            sleep($this->delayBetweenBatches);
+        }
+    }
+}
+```
+
+## Testing
+
+### PHPUnit Example
+
+```php
+use PHPUnit\Framework\TestCase;
+use Shoutbox\Client;
+use Shoutbox\EmailOptions;
+
+class EmailTest extends TestCase
+{
+    private $client;
+
+    protected function setUp(): void
+    {
+        $this->client = new Client('test-api-key');
+    }
+
+    public function testSendEmail()
+    {
+        $options = new EmailOptions();
+        $options->from = 'test@example.com';
+        $options->to = 'recipient@example.com';
+        $options->subject = 'Test Email';
+        $options->html = '<h1>Test</h1>';
+
+        $result = $this->client->sendEmail($options);
+        $this->assertTrue($result);
+    }
+}
+```
+
+## Troubleshooting
+
+Common issues and solutions:
+
+1. **API Key Issues**
+   - Verify key is set correctly
+   - Check environment variables
+   - Ensure key has proper permissions
+
+2. **Validation Errors**
+   - Check required fields
+   - Validate email addresses
+   - Verify attachment formats
+
+3. **Rate Limiting**
+   - Implement proper delays
+   - Use batch processing
+   - Monitor API usage
+
+4. **Attachment Problems**
+   - Check file permissions
+   - Verify file paths
+   - Validate file sizes
+
+## Support
+
+For additional support:
+- Check GitHub issues
+- Contact support team
+- Review API documentation
+- Join developer community

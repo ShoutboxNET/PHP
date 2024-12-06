@@ -1,0 +1,325 @@
+---
+title: "SMTP Client Implementation"
+description: "Detailed guide for using the Shoutbox SMTP client"
+---
+
+# SMTP Client Implementation Guide
+
+This guide covers the usage of the Shoutbox SMTP client, which provides an alternative way to send emails through our service.
+
+## Installation
+
+Install via Composer:
+```bash
+composer require shoutboxnet/shoutbox
+```
+
+## Basic Usage
+
+### Initialize SMTP Client
+
+```php
+use Shoutbox\SMTPClient;
+use Shoutbox\EmailOptions;
+
+$apiKey = getenv('SHOUTBOX_API_KEY') ?: 'your-api-key-here';
+$client = new SMTPClient($apiKey);
+```
+
+### Send Basic Email
+
+```php
+try {
+    $options = new EmailOptions();
+    $options->from = 'sender@example.com';
+    $options->to = 'recipient@example.com';
+    $options->subject = 'Test Email via SMTP';
+    $options->html = '<h1>Hello!</h1><p>This is a test email.</p>';
+    $options->name = 'Sender Name';
+    $options->replyTo = 'reply@example.com';
+
+    $client->sendEmail($options);
+    echo "Email sent successfully!\n";
+} catch (Exception $e) {
+    echo "Error: " . $e->getMessage() . "\n";
+}
+```
+
+### Multiple Recipients
+
+```php
+try {
+    $options = new EmailOptions();
+    $options->from = 'sender@example.com';
+    $options->to = [
+        'recipient1@example.com',
+        'recipient2@example.com'
+    ];
+    $options->cc = [
+        'cc1@example.com',
+        'cc2@example.com'
+    ];
+    $options->subject = 'Group Email via SMTP';
+    $options->html = '<h1>Hello Everyone!</h1>';
+
+    $client->sendEmail($options);
+} catch (Exception $e) {
+    echo "Error: " . $e->getMessage() . "\n";
+}
+```
+
+### Attachments
+
+```php
+use Shoutbox\Attachment;
+
+try {
+    $attachment = new Attachment();
+    $attachment->filepath = './document.pdf';
+    $attachment->filename = 'report.pdf';
+    $attachment->contentType = 'application/pdf';
+
+    $options = new EmailOptions();
+    $options->from = 'sender@example.com';
+    $options->to = 'recipient@example.com';
+    $options->subject = 'Document via SMTP';
+    $options->html = '<h1>Please find the document attached</h1>';
+    $options->attachments = [$attachment];
+
+    $client->sendEmail($options);
+} catch (Exception $e) {
+    echo "Error: " . $e->getMessage() . "\n";
+}
+```
+
+### Custom Headers
+
+```php
+try {
+    $options = new EmailOptions();
+    $options->from = 'sender@example.com';
+    $options->to = 'recipient@example.com';
+    $options->subject = 'Test Email with Headers';
+    $options->html = '<h1>Hello!</h1>';
+    $options->headers = [
+        'X-Custom-Header' => 'Custom Value',
+        'X-Priority' => '1'
+    ];
+
+    $client->sendEmail($options);
+} catch (Exception $e) {
+    echo "Error: " . $e->getMessage() . "\n";
+}
+```
+
+## Advanced Features
+
+### HTML and Plain Text Content
+
+```php
+$options = new EmailOptions();
+$options->from = 'sender@example.com';
+$options->to = 'recipient@example.com';
+$options->subject = 'Multipart Email';
+$options->html = '<h1>Hello!</h1><p>This is HTML content.</p>';
+$options->text = 'Hello! This is plain text content.';
+
+$client->sendEmail($options);
+```
+
+### Multiple Attachments
+
+```php
+$attachment1 = new Attachment();
+$attachment1->filepath = './document1.pdf';
+$attachment1->filename = 'report1.pdf';
+
+$attachment2 = new Attachment();
+$attachment2->filepath = './document2.pdf';
+$attachment2->filename = 'report2.pdf';
+
+$options = new EmailOptions();
+$options->from = 'sender@example.com';
+$options->to = 'recipient@example.com';
+$options->subject = 'Multiple Attachments';
+$options->html = '<h1>Multiple documents attached</h1>';
+$options->attachments = [$attachment1, $attachment2];
+
+$client->sendEmail($options);
+```
+
+## Error Handling
+
+### Comprehensive Error Handling
+
+```php
+try {
+    $client->sendEmail($options);
+} catch (\Shoutbox\Exceptions\SmtpException $e) {
+    // Handle SMTP-specific errors
+    echo "SMTP Error: " . $e->getMessage() . "\n";
+    echo "SMTP Code: " . $e->getCode() . "\n";
+} catch (\Shoutbox\Exceptions\ValidationException $e) {
+    // Handle validation errors
+    echo "Validation Error: " . $e->getMessage() . "\n";
+    foreach ($e->getErrors() as $field => $error) {
+        echo "$field: $error\n";
+    }
+} catch (\Exception $e) {
+    // Handle other errors
+    echo "General Error: " . $e->getMessage() . "\n";
+}
+```
+
+## Best Practices
+
+### Configuration Management
+
+```php
+class EmailConfig {
+    private static function getApiKey(): string {
+        $apiKey = getenv('SHOUTBOX_API_KEY');
+        if (!$apiKey) {
+            throw new RuntimeException('SHOUTBOX_API_KEY not set');
+        }
+        return $apiKey;
+    }
+
+    public static function getClient(): SMTPClient {
+        return new SMTPClient(self::getApiKey());
+    }
+}
+
+// Usage
+$client = EmailConfig::getClient();
+```
+
+### Rate Limiting Implementation
+
+```php
+class RateLimitedSmtp {
+    private $client;
+    private $lastSent = 0;
+    private $rateLimit = 1; // seconds between sends
+
+    public function __construct(SMTPClient $client) {
+        $this->client = $client;
+    }
+
+    public function sendWithRateLimit(EmailOptions $options): void {
+        $now = time();
+        $timeSinceLastSend = $now - $this->lastSent;
+        
+        if ($timeSinceLastSend < $this->rateLimit) {
+            sleep($this->rateLimit - $timeSinceLastSend);
+        }
+
+        $this->client->sendEmail($options);
+        $this->lastSent = time();
+    }
+}
+```
+
+### Bulk Sending
+
+```php
+class BulkSmtpSender {
+    private $client;
+    private $batchSize = 50;
+    private $delayBetweenBatches = 1; // seconds
+
+    public function __construct(SMTPClient $client) {
+        $this->client = $client;
+    }
+
+    public function sendBulk(array $recipients, EmailOptions $template): array {
+        $results = ['success' => [], 'failed' => []];
+        $batches = array_chunk($recipients, $this->batchSize);
+
+        foreach ($batches as $batch) {
+            foreach ($batch as $recipient) {
+                $options = clone $template;
+                $options->to = $recipient;
+                
+                try {
+                    $this->client->sendEmail($options);
+                    $results['success'][] = $recipient;
+                } catch (Exception $e) {
+                    $results['failed'][] = [
+                        'recipient' => $recipient,
+                        'error' => $e->getMessage()
+                    ];
+                }
+            }
+
+            sleep($this->delayBetweenBatches);
+        }
+
+        return $results;
+    }
+}
+```
+
+## Testing
+
+### PHPUnit Example
+
+```php
+use PHPUnit\Framework\TestCase;
+use Shoutbox\SMTPClient;
+use Shoutbox\EmailOptions;
+
+class SmtpTest extends TestCase
+{
+    private $client;
+
+    protected function setUp(): void
+    {
+        $this->client = new SMTPClient('test-api-key');
+    }
+
+    public function testSendEmail()
+    {
+        $options = new EmailOptions();
+        $options->from = 'test@example.com';
+        $options->to = 'recipient@example.com';
+        $options->subject = 'Test Email';
+        $options->html = '<h1>Test</h1>';
+
+        $result = $this->client->sendEmail($options);
+        $this->assertTrue($result);
+    }
+}
+```
+
+## Troubleshooting
+
+Common SMTP-specific issues and solutions:
+
+1. **Connection Issues**
+   - Check network connectivity
+   - Verify firewall settings
+   - Confirm API key validity
+
+2. **Authentication Errors**
+   - Verify API key
+   - Check account status
+   - Confirm sending permissions
+
+3. **Rate Limiting**
+   - Implement proper delays
+   - Use batch processing
+   - Monitor sending rates
+
+4. **Attachment Issues**
+   - Check file sizes
+   - Verify MIME types
+   - Validate file paths
+
+## Support
+
+For additional support:
+- Review error messages
+- Check documentation
+- Contact support team
+- Join developer community
