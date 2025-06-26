@@ -1,6 +1,32 @@
+![Header](https://github.com/user-attachments/assets/52d6ff91-3425-4e31-bff3-426bbb6eb113)
+
+<p align="center">
+  <a href="https://docs.shoutbox.net/quickstart" style="font-size: 2em; text-decoration: underline; color: #0366d6;">Quickstart Docs</a>
+</p>
+
+<p align="center" style="font-size: 1.5em;">
+  <b>Language & Framework guides</b>
+</p>
+
+<p align="center">
+  <a href="https://docs.shoutbox.net/examples/nextjs-lib">Next.js</a> -
+  <a href="https://docs.shoutbox.net/examples/typescript">Typescript</a> -
+  <a href="https://docs.shoutbox.net/examples/javascript-lib">Javascript</a> -
+  <a href="https://docs.shoutbox.net/examples/python-lib">Python</a> -
+  <a href="https://docs.shoutbox.net/examples/php-lib">PHP</a> -
+  <a href="https://docs.shoutbox.net/examples/php-laravel-lib">Laravel</a> -
+  <a href="https://docs.shoutbox.net/examples/go">Go</a>
+</p>
+
 # Shoutbox.net Developer API
 
 Shoutbox.net is a Developer API designed to send transactional emails at scale. This documentation covers all integration methods, from direct API calls to full framework integration.
+
+## Setup
+
+For these integrations to work, you will need an <a href="https://hub.shoutbox.net" target="_blank">account</a> on <a href="https://shoutbox.net" target="_blank">Shoutbox.net</a>. You can create and copy the required API key on the <a href="https://hub.shoutbox.net/app/dashboard" target="_blank">Shoutbox.net dashboard</a>!
+
+The API key is required for any call to the <a href="https://shoutbox.net" target="_blank">Shoutbox.net</a> backend; for SMTP, the API key is your password and 'shoutbox' the user to send emails.
 
 ## Integration Methods
 
@@ -53,6 +79,7 @@ if ($httpCode >= 200 && $httpCode < 300) {
 ```
 
 ### Direct API Features
+
 - No dependencies required
 - Simple cURL implementation
 - Full control over the request
@@ -95,7 +122,7 @@ try {
     $options->replyTo = 'reply@example.com';
 
     $client->sendEmail($options);
-    
+
     // Email with attachment
     $attachment = new Attachment();
     $attachment->filepath = './document.pdf';
@@ -150,6 +177,7 @@ try {
 ```
 
 ### Library Features
+
 - Type-safe email options
 - Built-in error handling
 - File attachment support
@@ -162,11 +190,13 @@ try {
 ### Installation
 
 1. Install the package:
+
 ```bash
 composer require shoutboxnet/shoutbox
 ```
 
 2. Add configuration to `config/services.php`:
+
 ```php
 'shoutbox' => [
     'key' => env('SHOUTBOX_API_KEY'),
@@ -174,6 +204,7 @@ composer require shoutboxnet/shoutbox
 ```
 
 3. Add to `.env`:
+
 ```
 SHOUTBOX_API_KEY=your-api-key-here
 ```
@@ -181,6 +212,7 @@ SHOUTBOX_API_KEY=your-api-key-here
 ### Usage Examples
 
 #### Basic Usage
+
 ```php
 use Illuminate\Support\Facades\Mail;
 
@@ -189,6 +221,7 @@ Mail::to('recipient@example.com')
 ```
 
 #### Advanced Usage
+
 ```php
 Mail::to('recipient@example.com')
     ->from('sender@example.com', 'Sender Name')
@@ -198,6 +231,7 @@ Mail::to('recipient@example.com')
 ```
 
 #### Queue Support
+
 ```php
 class SendEmailJob implements ShouldQueue
 {
@@ -212,6 +246,7 @@ class SendEmailJob implements ShouldQueue
 ```
 
 ### Laravel Features
+
 - Full Laravel Mail integration
 - Queue support
 - Rate limiting
@@ -237,6 +272,7 @@ The `EmailOptions` class supports:
 - **tags** (array): Email tags
 
 ### Attachment Properties
+
 - **filepath**: Path to the file
 - **filename**: Name for the attachment (optional)
 - **contentType**: MIME type (optional)
@@ -245,23 +281,27 @@ The `EmailOptions` class supports:
 ## Considerations
 
 ### API vs SMTP Client
+
 - API Client is recommended for most use cases
 - SMTP Client is useful for legacy system compatibility
 - Both support the same features
 
 ### Security
+
 - Store API keys securely
 - Use environment variables
 - Validate email addresses
 - Sanitize HTML content
 
 ### Performance
+
 - Use queues for bulk sending
 - Implement rate limiting
 - Handle errors gracefully
 - Monitor API responses
 
 ### Testing
+
 - Use test API keys
 - Mock API calls in tests
 - Verify email delivery
@@ -270,16 +310,19 @@ The `EmailOptions` class supports:
 ## Development
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/shoutboxnet/shoutbox-PHP.git
 ```
 
 2. Install dependencies:
+
 ```bash
 composer install
 ```
 
 3. Run tests:
+
 ```bash
 composer test
 ```
